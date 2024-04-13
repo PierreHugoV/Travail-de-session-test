@@ -1,48 +1,63 @@
+import openpyxl
 import pandas as pd
 import json
+import glob
+import pip
+import openpyxl
 import os
 
-# Define the base directory path for 'data/final' relative to the 'TRAVAIL' directory
-base_dir = '../data/final/'
+# Fonction pour charger les fichiers depuis un sous-dossier spécifique
+def load_files_from_subfolder(subfolder_path):
+    data = {}
+    file_found = False
+    for file_path in glob.glob(f"{subfolder_path}/*"):
+        file_found = True
+        if file_path.endswith('.xlsx'):
+            data[os.path.basename(file_path)] = pd.read_excel(file_path)
+        elif file_path.endswith('.csv'):
+            data[os.path.basename(file_path)] = pd.read_csv(file_path)
+        elif file_path.endswith('.json'):
+            with open(file_path, 'r') as file:
+                json_data = json.load(file)
+            data[os.path.basename(file_path)] = pd.DataFrame(json_data)
 
-# Function to read data from a file based on its extension
-def read_file(file_path):
-    if file_path.endswith('.csv'):
-        return pd.read_csv(file_path)
-    elif file_path.endswith('.xlsx'):
-        return pd.read_excel(file_path)
-    elif file_path.endswith('.json'):
-        with open(file_path, 'r') as file:
-            return pd.DataFrame(json.load(file))
-    else:
-        raise ValueError(f"Unsupported file format: {file_path}")
+    if not file_found:
+        print(f"No data files found in {subfolder_path}. Check the directory path and file extensions.")
 
-# Function to read all files in a given directory and combine them
-def read_data_from_directory(directory_path):
-    all_data_frames = []
-    for filename in os.listdir(directory_path):
-        if filename.endswith(('.csv', '.xlsx', '.json')):
-            file_path = os.path.join(directory_path, filename)
-            df = read_file(file_path)
-            all_data_frames.append(df)
-    if all_data_frames:
-        return pd.concat(all_data_frames, ignore_index=True)
-    else:
-        return pd.DataFrame()  # Return an empty DataFrame if there are no files
+    return data
 
-# Reading data from all categories and storing in a dictionary
-data_categories = ['clients', 'conseillers', 'portfolios', 'produits', 'titres']
-data_frames = {}
 
-for category in data_categories:
-    directory_path = os.path.join(base_dir, category)
-    data_frames[category] = read_data_from_directory(directory_path)
+# Fonction principale pour charger toutes les données
+def load_all_data(base_dir):
+    all_data = {}
+    total_files_loaded = 0
+    for subfolder in ['clients', 'conseillers', 'portfolios', 'produits', 'titres']:
+        subfolder_path = os.path.join(base_dir, subfolder)
+        subfolder_data = load_files_from_subfolder(subfolder_path)
+        if subfolder_data:
+            all_data[subfolder] = subfolder_data
+            total_files_loaded += len(subfolder_data)
+        else:
+            print(f"No files loaded from subfolder: {subfolder}")
 
-# Combine all DataFrames from the data_frames dictionary into a single DataFrame
-combined_data = pd.concat(data_frames.values(), ignore_index=True)
+    # Return the total number of files loaded and the data dictionary
+    return total_files_loaded, all_data
 
-# Write the combined DataFrame to a new output file (Excel format)
-output_file_path = os.path.join(base_dir, 'combined_data.xlsx')
-combined_data.to_excel(output_file_path, index=False)
 
-print(f"Data combined and written to {output_file_path}")
+def main():
+    # Le chemin de base pour le dossier 'data' dans PyCharm
+    base_data_dir = '../data/final'  # Ajuster le chemin vers le dossier 'data'
+    total_files_loaded, loaded_data = load_all_data(base_data_dir)
+
+    # Afficher le total de fichiers chargés
+    print(f"Total number of data files loaded: {total_files_loaded}")
+
+    # Affichage des données chargées pour vérification
+    for category, data_files in loaded_data.items():
+        print(f"Category: {category}")
+        for file_name, data_frame in data_files.items():
+            print(f"Data from {file_name}:")
+            print(data_frame.head(), '\\n')  # Afficher seulement les premières lignes
+
+if __name__ == "__main__":
+    main()
